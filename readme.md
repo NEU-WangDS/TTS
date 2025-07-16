@@ -1,0 +1,1 @@
+pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git

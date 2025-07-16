@@ -1,0 +1,26 @@
+/* 档案位置: frontend/static/style.css */
+body {
+    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    transition: background-color 0.3s;
+}
+
+.container {
+    max-width: 800px;
+}
+
+.card {
+    border: none;
+    border-radius: 0.75rem;
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+.btn-primary {
+    padding: 0.75rem 1.25rem;
+    font-weight: bold;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+#audio-result audio {
+    width: 100%;
+}

@@ -1,0 +1,33 @@
+# Python 缓存
+__pycache__/
+*.pyc
+
+# Conda 环境文件夹
+# 强烈建议不要上传环境本身
+/voice_app_env/
+
+# IDE 和编辑器配置
+.vscode/
+.idea/
+
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db
+
+# 大型数据和模型文件
+# 我们只上传代码，不上传数据
+#/models_and_data/
+
+# 如果您想上传 prompts 文件夹，但忽略其他
+# 可以用下面的规则替换上面的 /models_and_data/
+/models_and_data/*
+!/models_and_data/prompts/
+
+# 敏感信息文件
+.env
+*.env
+secrets.json
+credentials.json
+
+# 日志文件
+*.log

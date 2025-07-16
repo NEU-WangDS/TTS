@@ -1,0 +1,44 @@
+# backend/requirements.txt
+
+# --- Web 框架 ---
+fastapi
+uvicorn[standard]
+
+# --- 核心 AI 函式庫 (版本經過特別挑選以確保相容性) ---
+# PyTorch: 選擇一個與 Amphion 和新版 transformers 相容的穩定版本
+torch==2.1.2
+torchaudio==2.1.2
+# Transformers: 鎖定在 4.30.2 版本，這是確保 Amphion/MaskGCT 正常運行的關鍵
+transformers==4.30.2
+# Datasets: 用於 Whisper 腳本
+datasets
+
+# --- AI 加速與輔助工具 ---
+accelerate
+safetensors
+# Jiwer: 使用較新版本以支援 compute_measures()
+jiwer>=3.0.0
+
+# --- 音訊與數據處理 ---
+soundfile
+librosa
+pydub
+numpy<2.0.0 # 鎖定 numpy 版本以避免與舊版 torch/numba 的相容性問題
+pandas
+
+# --- Amphion/MaskGCT 特定依賴 ---
+# 這些是 MaskGCT 正常運行所需要的套件
+phonemizer
+g2p-en
+unidecode
+cn2an
+pyopenjtalk
+pypinyin
+jaconv
+jieba
+json5
+ruamel.yaml
+einops
+# --- NLLB 翻譯模型特定依賴 ---
+sentencepiece
+sacremoses
