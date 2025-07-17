@@ -14,6 +14,8 @@ import numpy as np
 from tqdm import tqdm
 import jieba
 from opencc import OpenCC
+from janome.tokenizer import Tokenizer
+
 # -------------------------------------------------------------------
 # 導入所有需要的函式庫
 # -------------------------------------------------------------------
@@ -53,6 +55,8 @@ class AIPipeline:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self.cc = OpenCC('t2s')
+        self.jp_tokenizer = Tokenizer() # 新增：初始化日语分词器
+
         # --- 1. 載入 NLLB 翻譯模型 ---
         self._load_translator_model()
 
@@ -190,16 +194,13 @@ class AIPipeline:
             return recognized_text
     
 
-
-    # 在 backend/ai_pipeline.py 文件中，找到并替换这个函数
-
     def evaluate(self, reference_text: str, hypothesis_text: str, lang_code: str) -> dict:
         """
         使用 Jiwer 计算 WER 和 CER。
-        (最终版：采用标准范式处理中文分词，以解决 jiwer 的解析错误)
+        (最终版：智能处理中文和日文分词)
         """
         print(f"执行评估 (语言: {lang_code})...")
-        
+
         # 1. 定义通用的文本标准化规则
         transformation = jiwer.Compose([
             jiwer.ToLowerCase(),
@@ -207,26 +208,32 @@ class AIPipeline:
             jiwer.Strip(),
             jiwer.RemovePunctuation(),
         ])
-        
+
         # 2. 对两个字符串应用标准化规则
         processed_reference = transformation(reference_text)
         processed_hypothesis = transformation(hypothesis_text)
 
-        # 3. 智能计算 WER (最终修正版)
+        # 3. 智能计算 WER
         if lang_code == 'zh':
-            print("      检测到中文，使用 jieba 分词并用空格连接...")
-            # 对于中文，先用 jieba 分词，然后用空格将词语连接成一个标准字符串
+            print("      检测到中文，使用 jieba 进行分词...")
+            # 对于中文，使用 jieba 分词，然后用空格连接
             ref_words = " ".join(jieba.lcut(processed_reference))
             hyp_words = " ".join(jieba.lcut(processed_hypothesis))
-            
-            # 将两个处理好的、空格分隔的字符串交给 jiwer
             wer_score = jiwer.wer(ref_words, hyp_words)
+
+        elif lang_code == 'ja':
+            print("      检测到日文，使用 Janome 进行分词...")
+            # 对于日文，使用 Janome 分词，然后用空格连接
+            # t.tokenize 返回的是一个生成器，我们需要提取其中的 surface 属性
+            ref_words = " ".join([token.surface for token in self.jp_tokenizer.tokenize(processed_reference)])
+            hyp_words = " ".join([token.surface for token in self.jp_tokenizer.tokenize(processed_hypothesis)])
+            wer_score = jiwer.wer(ref_words, hyp_words)
+
         else:
-            # 对于其他语言，直接使用 jiwer 默认的空格分词
+            # 对于其他语言（如德语、法语），直接使用 jiwer 默认的空格分词
             wer_score = jiwer.wer(processed_reference, processed_hypothesis)
-            
+
         # 4. CER 是基于字符的，不受分词影响，可以直接计算
-        # 我们仍然使用处理过的字符串，以确保公平性 (移除了标点和多余空格)
         cer_score = jiwer.cer(processed_reference, processed_hypothesis)
 
         return {
