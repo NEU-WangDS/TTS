@@ -12,7 +12,8 @@ import jiwer
 import soundfile as sf
 import numpy as np
 from tqdm import tqdm
-
+import jieba
+from opencc import OpenCC
 # -------------------------------------------------------------------
 # 導入所有需要的函式庫
 # -------------------------------------------------------------------
@@ -51,7 +52,7 @@ class AIPipeline:
         
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-
+        self.cc = OpenCC('t2s')
         # --- 1. 載入 NLLB 翻譯模型 ---
         self._load_translator_model()
 
@@ -161,26 +162,45 @@ class AIPipeline:
         return recovered_audio, 24000
 
     def recognize(self, audio_path: str, lang: str) -> str:
-        """
-        使用 Whisper 模型識別語音。
-        """
-        print(f"執行語音辨識: {audio_path} (語言: {lang})")
-        result = self.whisper_pipe(
-            audio_path,
-            generate_kwargs={"language": lang, "task": "transcribe"}
-        )
-        # 確保返回的文本是乾淨的字串
-        return result.get("text", "").strip()
-    
-# 在 backend/ai_pipeline.py 文件中，找到并替换这个函数
+            """
+            使用 Whisper 模型识别语音。
+            (最终版：在输出中文结果后，立即统一为简体)
+            """
+            print(f"执行语音识别: {audio_path} (语言: {lang})")
+            
+            # 调用 Whisper 模型
+            result = self.whisper_pipe(
+                audio_path,
+                generate_kwargs={"language": lang, "task": "transcribe"}
+            )
+            recognized_text = result.get("text", "").strip()
 
-    def evaluate(self, reference_text: str, hypothesis_text: str) -> dict:
+            # 核心逻辑：如果是中文，立即进行简繁统一
+            if lang == 'chinese':
+                print("      检测到中文识别结果，执行简繁统一...")
+                try:
+                    simplified_text = self.cc.convert(recognized_text)
+                    return simplified_text
+                except Exception as e:
+                    print(f"      [警告] OpenCC 简繁转换失败: {e}")
+                    # 即使转换失败，也返回原始识别结果
+                    return recognized_text
+            
+            # 如果不是中文，直接返回原始识别结果
+            return recognized_text
+    
+
+
+    # 在 backend/ai_pipeline.py 文件中，找到并替换这个函数
+
+    def evaluate(self, reference_text: str, hypothesis_text: str, lang_code: str) -> dict:
         """
-        使用 Jiwer 计算 WER 和 CER。(已修改为兼容最旧版的 API)
+        使用 Jiwer 计算 WER 和 CER。
+        (最终版：采用标准范式处理中文分词，以解决 jiwer 的解析错误)
         """
-        print("执行评估 (使用最兼容的 Jiwer API)...")
+        print(f"执行评估 (语言: {lang_code})...")
         
-        # 1. 定义文本转换的规则
+        # 1. 定义通用的文本标准化规则
         transformation = jiwer.Compose([
             jiwer.ToLowerCase(),
             jiwer.RemoveMultipleSpaces(),
@@ -188,12 +208,25 @@ class AIPipeline:
             jiwer.RemovePunctuation(),
         ])
         
-        # 2. 在调用 jiwer 之前，手动对两个字符串应用转换规则
+        # 2. 对两个字符串应用标准化规则
         processed_reference = transformation(reference_text)
         processed_hypothesis = transformation(hypothesis_text)
-        
-        # 3. 调用 jiwer 最基础的功能，只传入两个处理好的字符串
-        wer_score = jiwer.wer(processed_reference, processed_hypothesis)
+
+        # 3. 智能计算 WER (最终修正版)
+        if lang_code == 'zh':
+            print("      检测到中文，使用 jieba 分词并用空格连接...")
+            # 对于中文，先用 jieba 分词，然后用空格将词语连接成一个标准字符串
+            ref_words = " ".join(jieba.lcut(processed_reference))
+            hyp_words = " ".join(jieba.lcut(processed_hypothesis))
+            
+            # 将两个处理好的、空格分隔的字符串交给 jiwer
+            wer_score = jiwer.wer(ref_words, hyp_words)
+        else:
+            # 对于其他语言，直接使用 jiwer 默认的空格分词
+            wer_score = jiwer.wer(processed_reference, processed_hypothesis)
+            
+        # 4. CER 是基于字符的，不受分词影响，可以直接计算
+        # 我们仍然使用处理过的字符串，以确保公平性 (移除了标点和多余空格)
         cer_score = jiwer.cer(processed_reference, processed_hypothesis)
 
         return {

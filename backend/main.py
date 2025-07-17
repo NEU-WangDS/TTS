@@ -80,7 +80,7 @@ app.mount("/prompts", StaticFiles(directory=PROMPTS_DIR), name="prompts")
 # --- 4. 語言代碼映射 ---
 # 將前端傳來的簡單代碼，轉換為各個模型需要的特定代碼
 NLLB_LANG_MAP = {
-    "zh": "zho_Hant", "ja": "jpn_Jpan", "ko": "kor_Hang",
+    "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang",
     "de": "deu_Latn", "fr": "fra_Latn"
 }
 WHISPER_LANG_MAP = {
@@ -141,7 +141,9 @@ async def process_full_pipeline(request: ProcessRequest):
         transcribed_text = ai_pipeline.recognize(save_path, whisper_lang)
 
         # --- 步驟 4: 評估 (WER/CER) ---
-        evaluation_results = ai_pipeline.evaluate(translated_text, transcribed_text)
+        #evaluation_results = ai_pipeline.evaluate(translated_text, transcribed_text)
+        # 将 request.target_language 作为新参数传递进去
+        evaluation_results = ai_pipeline.evaluate(translated_text, transcribed_text, request.target_language)
 
         # --- 步驟 5: 返回完整結果 ---
         return {
